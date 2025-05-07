@@ -25,11 +25,13 @@
 //! ```
 //!
 //! [1]: https://fennel.ai/blog/vector-search-in-200-lines-of-rust/
-
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
+#[cfg(feature = "serde")]
+use serde::{Serialize, Deserialize, Serializer, Deserializer};
 
 /// An index.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Index<const N: usize> {
     roots: Vec<Node<N>>,
     duplicates: BTreeMap<usize, Vec<usize>>,
@@ -38,11 +40,13 @@ pub struct Index<const N: usize> {
 /// A vector.
 pub type Vector<const N: usize> = [f32; N];
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 enum Node<const N: usize> {
     Branch(Box<Branch<N>>),
     Leaf(Box<Leaf>),
 }
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 struct Branch<const N: usize> {
     plane: Plane<N>,
     above: Node<N>,
@@ -51,9 +55,26 @@ struct Branch<const N: usize> {
 
 type Leaf = Vec<usize>;
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 struct Plane<const N: usize> {
     normal: Vector<N>,
     offset: f32,
+}
+
+#[cfg(feature = "serde")]
+impl<const N: usize> Serialize for Plane<N> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        (&self.normal[..], self.offset).serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, const N: usize> Deserialize<'de> for Plane<N> {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let (normal_vec, offset): (Vec<f32>, f32) = Deserialize::deserialize(deserializer)?;
+        let normal: [f32; N] = normal_vec.clone().try_into().map_err(|e| serde::de::Error::custom(format!("expected a Vec of length {}, got {:?}: {:?}", N, normal_vec, e)))?;
+        Ok(Plane { normal, offset })
+    }
 }
 
 impl<const N: usize> Index<N> {
