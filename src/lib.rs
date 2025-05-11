@@ -28,7 +28,9 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 #[cfg(feature = "serde")]
-use serde::{Serialize, Deserialize, Serializer, Deserializer};
+use serde::{Serialize, Deserialize};
+#[cfg(feature = "serde")]
+use serde_arrays;
 
 /// An index.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -57,24 +59,9 @@ type Leaf = Vec<usize>;
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 struct Plane<const N: usize> {
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     normal: Vector<N>,
     offset: f32,
-}
-
-#[cfg(feature = "serde")]
-impl<const N: usize> Serialize for Plane<N> {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        (&self.normal[..], self.offset).serialize(serializer)
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de, const N: usize> Deserialize<'de> for Plane<N> {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let (normal_vec, offset): (Vec<f32>, f32) = Deserialize::deserialize(deserializer)?;
-        let normal: [f32; N] = normal_vec.clone().try_into().map_err(|e| serde::de::Error::custom(format!("expected a Vec of length {}, got {:?}: {:?}", N, normal_vec, e)))?;
-        Ok(Plane { normal, offset })
-    }
 }
 
 impl<const N: usize> Index<N> {
